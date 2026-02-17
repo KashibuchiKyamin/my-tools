@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>稼働時間計算</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <h1>稼働時間計算（MVP）</h1>
+      <p>勤務CSV読込時はCSVの月、未読込時は当月を対象月として扱います。</p>
+    </header>
+
+    <section class="panel controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">入力・操作</h2>
+      <div class="control-grid">
+        <label class="control-item">
+          <span>休日CSV</span>
+          <input id="holidayCsvInput" type="file" accept=".csv" />
+        </label>
+        <label class="control-item">
+          <span>勤務CSV</span>
+          <input id="workCsvInput" type="file" accept=".csv" />
+        </label>
+        <label class="control-item">
+          <span>対象月</span>
+          <input id="targetMonth" type="text" readonly />
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="calculateButton" type="button">計算</button>
+        <button id="exportButton" type="button">勤務CSVエクスポート</button>
+      </div>
+    </section>
+
+    <section class="panel summary" aria-labelledby="summary-title">
+      <h2 id="summary-title">サマリ</h2>
+      <dl class="summary-grid">
+        <div><dt>稼働日数</dt><dd id="workingDays">0日</dd></div>
+        <div><dt>入力済み日数</dt><dd id="enteredDays">0日</dd></div>
+        <div><dt>総労働時間（実績合計）</dt><dd id="totalActual">00:00</dd></div>
+        <div><dt>総労働時間（15分丸め合計）</dt><dd id="totalRounded">00:00</dd></div>
+        <div><dt>総労働時間（15分丸め10進合計）</dt><dd id="totalRoundedDecimal">0.00</dd></div>
+        <div><dt>差分（実績 - 15分丸め）</dt><dd id="totalGap" class="warn">+00:00</dd></div>
+        <div><dt>今月の着地予想労働時間</dt><dd id="forecast">0:00</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel errors" aria-labelledby="errors-title">
+      <h2 id="errors-title">エラー一覧</h2>
+      <ul id="errorList">
+        <li>エラーはありません。</li>
+      </ul>
+    </section>
+
+    <section class="panel table-panel" aria-labelledby="table-title">
+      <h2 id="table-title">勤務入力テーブル（対象月の全日）</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>開始</th>
+              <th>終了</th>
+              <th>休憩</th>
+              <th>日次実績</th>
+              <th>日次15分丸め</th>
+              <th>日次15分丸め10進</th>
+              <th>累計（cumulative_work）</th>
+            </tr>
+          </thead>
+          <tbody id="workTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

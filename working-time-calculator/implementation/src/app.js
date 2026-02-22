@@ -14,6 +14,7 @@ const elements = {
   targetMonth: document.getElementById("targetMonth"),
   calculateButton: document.getElementById("calculateButton"),
   exportButton: document.getElementById("exportButton"),
+  clearButton: document.getElementById("clearButton"),
   errorList: document.getElementById("errorList"),
   workTableBody: document.getElementById("workTableBody"),
   workingDays: document.getElementById("workingDays"),
@@ -27,12 +28,16 @@ const elements = {
 
 init();
 
-function init() {
+async function init() {
   renderMonth();
   renderRows();
   bindEvents();
   resetSummary();
   setErrors([]);
+  
+  // Auto-load CSV files
+  await autoLoadHolidayCsv();
+  await autoLoadWorkCsv();
 }
 
 function bindEvents() {
@@ -62,6 +67,10 @@ function bindEvents() {
 
   elements.exportButton.addEventListener("click", () => {
     exportWorkCsv();
+  });
+
+  elements.clearButton.addEventListener("click", () => {
+    clearWorkData();
   });
 }
 
@@ -568,4 +577,50 @@ function splitCsvLine(line) {
 
 function escapeAttr(value) {
   return value.replace(/"/g, "&quot;");
+}
+
+async function autoLoadHolidayCsv() {
+  try {
+    const response = await fetch("./holidays.csv");
+    if (!response.ok) {
+      return;
+    }
+    const text = await response.text();
+    loadHolidayCsv(text);
+  } catch (error) {
+    // File not found or network error - silently ignore
+    console.debug("Holiday CSV auto-load skipped:", error.message);
+  }
+}
+
+async function autoLoadWorkCsv() {
+  try {
+    const response = await fetch("./work.csv");
+    if (!response.ok) {
+      return;
+    }
+    const text = await response.text();
+    loadWorkCsv(text);
+    calculateAndRender();
+  } catch (error) {
+    // File not found or network error - silently ignore
+    console.debug("Work CSV auto-load skipped:", error.message);
+  }
+}
+
+function clearWorkData() {
+  if (!confirm("入力した勤務データをすべて削除します。よろしいですか？")) {
+    return;
+  }
+  
+  // Clear all input fields in the table
+  const rows = elements.workTableBody.querySelectorAll("tr");
+  rows.forEach((row) => {
+    row.querySelector('input[data-field="start"]').value = "";
+    row.querySelector('input[data-field="end"]').value = "";
+    row.querySelector('input[data-field="break"]').value = DEFAULT_BREAK;
+  });
+  
+  // Recalculate to show empty state
+  calculateAndRender();
 }

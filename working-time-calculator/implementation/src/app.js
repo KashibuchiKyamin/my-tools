@@ -2,6 +2,8 @@ const REQUIRED_WORK_HEADERS = ["date", "start", "end", "break", "cumulative_work
 const REQUIRED_HOLIDAY_HEADERS = ["date", "name"];
 const DEFAULT_BREAK = "01:00";
 const FIXED_DAILY_HOURS = 8.0;
+const STORAGE_KEY_HOLIDAYS = "workingTimeCalculator.holidays";
+const STORAGE_KEY_WORK = "workingTimeCalculator.work";
 
 const state = {
   targetMonth: getCurrentMonth(),
@@ -28,16 +30,15 @@ const elements = {
 
 init();
 
-async function init() {
+function init() {
   renderMonth();
   renderRows();
   bindEvents();
   resetSummary();
   setErrors([]);
   
-  // Auto-load CSV files
-  await autoLoadHolidayCsv();
-  await autoLoadWorkCsv();
+  // LocalStorage から自動復元
+  restoreFromLocalStorage();
 }
 
 function bindEvents() {
@@ -52,6 +53,7 @@ function bindEvents() {
     }
     const text = await file.text();
     loadHolidayCsv(text);
+    saveToLocalStorage(STORAGE_KEY_HOLIDAYS, text);
     calculateAndRender();
   });
 
@@ -62,6 +64,7 @@ function bindEvents() {
     }
     const text = await file.text();
     loadWorkCsv(text);
+    saveToLocalStorage(STORAGE_KEY_WORK, text);
     calculateAndRender();
   });
 
@@ -579,32 +582,30 @@ function escapeAttr(value) {
   return value.replace(/"/g, "&quot;");
 }
 
-async function autoLoadHolidayCsv() {
+function saveToLocalStorage(key, value) {
   try {
-    const response = await fetch("./holidays.csv");
-    if (!response.ok) {
-      return;
-    }
-    const text = await response.text();
-    loadHolidayCsv(text);
+    localStorage.setItem(key, value);
   } catch (error) {
-    // File not found or network error - silently ignore
-    console.debug("Holiday CSV auto-load skipped:", error.message);
+    console.warn("LocalStorage への保存に失敗しました:", error.message);
   }
 }
 
-async function autoLoadWorkCsv() {
+function restoreFromLocalStorage() {
   try {
-    const response = await fetch("./work.csv");
-    if (!response.ok) {
-      return;
+    // 休日CSVの復元
+    const holidaysData = localStorage.getItem(STORAGE_KEY_HOLIDAYS);
+    if (holidaysData) {
+      loadHolidayCsv(holidaysData);
     }
-    const text = await response.text();
-    loadWorkCsv(text);
-    calculateAndRender();
+    
+    // 勤務CSVの復元
+    const workData = localStorage.getItem(STORAGE_KEY_WORK);
+    if (workData) {
+      loadWorkCsv(workData);
+      calculateAndRender();
+    }
   } catch (error) {
-    // File not found or network error - silently ignore
-    console.debug("Work CSV auto-load skipped:", error.message);
+    console.warn("LocalStorage からの復元に失敗しました:", error.message);
   }
 }
 
@@ -620,6 +621,13 @@ function clearWorkData() {
     row.querySelector('input[data-field="end"]').value = "";
     row.querySelector('input[data-field="break"]').value = DEFAULT_BREAK;
   });
+  
+  // LocalStorageからも削除
+  try {
+    localStorage.removeItem(STORAGE_KEY_WORK);
+  } catch (error) {
+    console.warn("LocalStorage からのデータ削除に失敗しました:", error.message);
+  }
   
   // Recalculate to show empty state
   calculateAndRender();

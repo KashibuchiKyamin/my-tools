@@ -77,6 +77,15 @@ function bindEvents() {
   });
 }
 
+function bindInputChangeListeners() {
+  const inputs = elements.workTableBody.querySelectorAll('input[type="time"]');
+  inputs.forEach((input) => {
+    input.addEventListener("input", () => {
+      saveCurrentWorkDataToLocalStorage();
+    });
+  });
+}
+
 function getCurrentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -95,6 +104,18 @@ function renderRows(existingRows = new Map()) {
     const row = document.createElement("tr");
     row.dataset.date = date;
 
+    // 土日祝日の判定
+    const dayOfWeek = toDate(date).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = state.holidays.has(date);
+    
+    if (isWeekend) {
+      row.classList.add("weekend");
+    }
+    if (isHoliday) {
+      row.classList.add("holiday");
+    }
+
     row.innerHTML = `
       <td>${date}</td>
       <td><input data-field="start" type="time" value="${escapeAttr(existing.start || "")}"></td>
@@ -108,6 +129,9 @@ function renderRows(existingRows = new Map()) {
 
     elements.workTableBody.appendChild(row);
   });
+  
+  // 入力フィールドの変更を監視してLocalStorageに自動保存
+  bindInputChangeListeners();
 }
 
 function getDatesOfMonth(month) {
@@ -176,6 +200,12 @@ function calculateAndRender() {
 
     resetRowView(view);
 
+    // 土日祝日の判定
+    const dayOfWeek = toDate(row.date).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = state.holidays.has(row.date);
+    const isNonWorkingDay = isWeekend || isHoliday;
+
     const isAllBlank = !row.start && !row.end && !row.break;
     if (isAllBlank) {
       view.cumulative.textContent = cumulativeRoundedDecimal.toFixed(2);
@@ -183,8 +213,11 @@ function calculateAndRender() {
     }
 
     if (!row.start || !row.end || !row.break) {
-      errors.push(`${row.date}: 開始・終了・休憩はすべて入力してください。`);
-      setRowError(view);
+      // 土日祝日は未入力でもエラーにしない
+      if (!isNonWorkingDay) {
+        errors.push(`${row.date}: 開始・終了・休憩はすべて入力してください。`);
+        setRowError(view);
+      }
       view.cumulative.textContent = cumulativeRoundedDecimal.toFixed(2);
       return;
     }
@@ -606,6 +639,62 @@ function restoreFromLocalStorage() {
     }
   } catch (error) {
     console.warn("LocalStorage からの復元に失敗しました:", error.message);
+  }
+}
+
+function saveCurrentWorkDataToLocalStorage() {
+  try {
+    const rows = getRowInputs();
+    const csvLines = [REQUIRED_WORK_HEADERS.join(",")];
+    
+    let cumulativeRoundedDecimal = 0;
+    
+    rows.forEach((row) => {
+      // 空白行はスキップ
+      const isAllBlank = !row.start && !row.end && !row.break;
+      if (isAllBlank) {
+        return;
+      }
+      
+      // 不完全な入力もスキップ
+      if (!row.start || !row.end || !row.break) {
+        return;
+      }
+      
+      // 時刻形式チェック
+      const startMinutes = toMinutes(row.start);
+      const endMinutes = toMinutes(row.end);
+      const breakMinutes = toMinutes(row.break);
+      
+      if (startMinutes === null || endMinutes === null || breakMinutes === null) {
+        return;
+      }
+      
+      if (endMinutes <= startMinutes) {
+        return;
+      }
+      
+      const actualMinutes = endMinutes - startMinutes - breakMinutes;
+      if (actualMinutes < 0) {
+        return;
+      }
+      
+      const rounded15Minutes = Math.round(actualMinutes / 15) * 15;
+      cumulativeRoundedDecimal += rounded15Minutes / 60;
+      
+      csvLines.push([
+        row.date,
+        row.start,
+        row.end,
+        row.break,
+        cumulativeRoundedDecimal.toFixed(2),
+      ].join(","));
+    });
+    
+    const csvText = csvLines.join("\n");
+    localStorage.setItem(STORAGE_KEY_WORK, csvText);
+  } catch (error) {
+    console.warn("LocalStorage への保存に失敗しました:", error.message);
   }
 }
 

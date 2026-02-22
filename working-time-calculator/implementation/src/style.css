@@ -176,3 +176,12 @@ input[type="time"] {
   color: #9f1f1f;
   font-weight: 700;
 }
+
+/* 土日祝日のスタイル */
+tbody tr.weekend {
+  background-color: #e8f4fd !important;
+}
+
+tbody tr.holiday {
+  background-color: #ffe8e8 !important;
+}

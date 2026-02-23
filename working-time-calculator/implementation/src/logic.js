@@ -155,8 +155,8 @@
   }
 
   /**
-   * CSV ヘッダー文字列を小文字キャメルけえに正規化
-   * @param {string} value - ヘッダー文字列（例: " date "）
+   * CSV ヘッダー文字列を正規化（小文字化＋空白削除）
+   * @param {string} value - ヘッダー文字列（例: " Date "、"START"）
    * @returns {string} 小文字、空白削除した文字列（例: "date"）
    * @example
    * normalizeHeader(' Date ')  // => 'date'

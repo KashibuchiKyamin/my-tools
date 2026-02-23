@@ -20,6 +20,7 @@ const {
   signedMinutesToHHmm,
   toMinutes,
   formatForecast,
+  splitCsvLine,
 } = require("../src/logic");
 
 describe("time helpers", () => {
@@ -104,5 +105,15 @@ describe("csv helpers", () => {
       ["a", "b,c"],
       ["1", "2"],
     ]);
+  });
+
+  /** CSV行分割テスト（連続クォートのエスケープを含む） */
+  test("splitCsvLine handles escaped quotes", () => {
+    // クォート内の連続クォートは単一クォートにエスケープ
+    expect(splitCsvLine('a,"b""c",d')).toEqual(["a", 'b"c', "d"]);
+    // 通常の分割
+    expect(splitCsvLine("1,2,3")).toEqual(["1", "2", "3"]);
+    // クォート内のカンマ
+    expect(splitCsvLine('x,"y,z",w')).toEqual(["x", "y,z", "w"]);
   });
 });

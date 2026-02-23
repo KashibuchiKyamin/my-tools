@@ -178,10 +178,10 @@ input[type="time"] {
 }
 
 /* 土日祝日のスタイル */
-tbody tr.weekend {
+tbody tr.saturday {
   background-color: #e8f4fd !important;
 }
 
-tbody tr.holiday {
+tbody tr.sunday-holiday {
   background-color: #ffe8e8 !important;
 }

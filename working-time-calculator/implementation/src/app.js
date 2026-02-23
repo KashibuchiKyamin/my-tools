@@ -138,14 +138,15 @@ function renderRows(existingRows = new Map()) {
 
     // 土日祝日の判定
     const dayOfWeek = toDate(date).getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
     const isHoliday = state.holidays.has(date);
     
-    if (isWeekend) {
-      row.classList.add("weekend");
+    if (isSaturday) {
+      row.classList.add("saturday");
     }
-    if (isHoliday) {
-      row.classList.add("holiday");
+    if (isSunday || isHoliday) {
+      row.classList.add("sunday-holiday");
     }
 
     row.innerHTML = `
@@ -232,11 +233,11 @@ function calculateAndRender() {
 
     resetRowView(view);
 
-    // 土日祝日の判定
+    // 平日のバリデーション
     const dayOfWeek = toDate(row.date).getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isHoliday = state.holidays.has(row.date);
-    const isNonWorkingDay = isWeekend || isHoliday;
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isNonWorkingDay = isSaturday || isSunday || isHoliday;
 
     const isAllBlank = !row.start && !row.end && !row.break;
     if (isAllBlank) {

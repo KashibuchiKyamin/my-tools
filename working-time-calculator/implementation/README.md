@@ -10,10 +10,16 @@
 - `src/index.html`
 - `src/style.css`
 - `src/app.js`
+- `src/logic.js`
 
 ## 起動方法
 
 - `src/index.html` をブラウザで直接開く
+
+## テスト
+
+1. `implementation` ディレクトリで依存関係をインストール
+2. `npm test` を実行
 
 ## MVP実装済み機能
 

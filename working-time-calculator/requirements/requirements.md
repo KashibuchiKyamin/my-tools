@@ -155,6 +155,7 @@ date,start,end,break,cumulative_work
   - 日次/総労働時間計算
   - 着地予想
   - CSV入出力
+- JavaScriptのロジックは Node.js + Jest の単体テストで検証できるようにする。
 
 ## 11. 未確定事項
 - なし（2026-02-17 時点で質問表の回答を反映済み）。

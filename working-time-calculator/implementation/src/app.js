@@ -5,6 +5,12 @@ const FIXED_DAILY_HOURS = 8.0;
 const STORAGE_KEY_HOLIDAYS = "workingTimeCalculator.holidays";
 const STORAGE_KEY_WORK = "workingTimeCalculator.work";
 
+
+// ブラウザ直開き時も安全に参照できるようにする
+const WorkingTimeCalc = (typeof window !== "undefined" ? window.WorkingTimeCalc : (typeof self !== "undefined" ? self.WorkingTimeCalc : undefined));
+if (!WorkingTimeCalc) {
+  throw new Error("WorkingTimeCalc がロードされていません。logic.js の読み込み順を確認してください。");
+}
 const {
   getDatesOfMonth,
   formatDate,
@@ -231,6 +237,7 @@ function calculateAndRender() {
     const dayOfWeek = toDate(row.date).getDay();
     const isSaturday = dayOfWeek === 6;
     const isSunday = dayOfWeek === 0;
+    const isHoliday = state.holidays.has(row.date);
     const isNonWorkingDay = isSaturday || isSunday || isHoliday;
 
     const isAllBlank = !row.start && !row.end && !row.break;

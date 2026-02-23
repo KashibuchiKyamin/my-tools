@@ -75,6 +75,38 @@ function bindEvents() {
   elements.clearButton.addEventListener("click", () => {
     clearWorkData();
   });
+
+  elements.targetMonth.addEventListener("change", () => {
+    const newMonth = elements.targetMonth.value.trim();
+    if (!newMonth) {
+      // 空の場合はデフォルト値に戻す
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    if (!isValidMonth(newMonth)) {
+      alert("対象月の形式が不正です（YYYY-MM）。");
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    // 稼働日がすべて未入力の場合のみ対象月を変更可能
+    const rows = getRowInputs();
+    const hasAnyInput = rows.some((row) => row.start || row.end || row.break);
+
+    if (hasAnyInput) {
+      alert("稼働日に入力がある場合は対象月を変更できません。入力内容をクリアしてからお試しください。");
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    // 対象月を変更
+    state.targetMonth = newMonth;
+    state.holidays = new Set(Array.from(state.holidays).filter((date) => date.startsWith(state.targetMonth)));
+    renderRows();
+    resetSummary();
+    setErrors([]);
+  });
 }
 
 function bindInputChangeListeners() {
@@ -402,12 +434,16 @@ function exportWorkCsv() {
 
   rows.forEach((row) => {
     const isAllBlank = !row.start && !row.end && !row.break;
+    
+    // 未入力行も出力対象（未入力の場合は空文字列で出力）
     if (isAllBlank) {
+      outputRows.push([row.date, "", "", "", cumulativeRoundedDecimal.toFixed(2)]);
       return;
     }
 
     if (!row.start || !row.end || !row.break) {
-      errors.push(`${row.date}: CSV出力には開始・終了・休憩の入力が必要です。`);
+      // 不完全な入力行も出力対象（累積値の計算は行わない）
+      outputRows.push([row.date, row.start, row.end, row.break, cumulativeRoundedDecimal.toFixed(2)]);
       return;
     }
 
@@ -720,4 +756,13 @@ function clearWorkData() {
   
   // Recalculate to show empty state
   calculateAndRender();
+}
+
+function isValidMonth(value) {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [yearStr, monthStr] = value.split("-");
+  const month = Number(monthStr);
+  return month >= 1 && month <= 12;
 }

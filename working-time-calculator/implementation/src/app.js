@@ -2,6 +2,8 @@ const REQUIRED_WORK_HEADERS = ["date", "start", "end", "break", "cumulative_work
 const REQUIRED_HOLIDAY_HEADERS = ["date", "name"];
 const DEFAULT_BREAK = "01:00";
 const FIXED_DAILY_HOURS = 8.0;
+const STORAGE_KEY_HOLIDAYS = "workingTimeCalculator.holidays";
+const STORAGE_KEY_WORK = "workingTimeCalculator.work";
 
 const state = {
   targetMonth: getCurrentMonth(),
@@ -14,6 +16,7 @@ const elements = {
   targetMonth: document.getElementById("targetMonth"),
   calculateButton: document.getElementById("calculateButton"),
   exportButton: document.getElementById("exportButton"),
+  clearButton: document.getElementById("clearButton"),
   errorList: document.getElementById("errorList"),
   workTableBody: document.getElementById("workTableBody"),
   workingDays: document.getElementById("workingDays"),
@@ -33,6 +36,9 @@ function init() {
   bindEvents();
   resetSummary();
   setErrors([]);
+  
+  // LocalStorage から自動復元
+  restoreFromLocalStorage();
 }
 
 function bindEvents() {
@@ -47,6 +53,7 @@ function bindEvents() {
     }
     const text = await file.text();
     loadHolidayCsv(text);
+    saveToLocalStorage(STORAGE_KEY_HOLIDAYS, text);
     calculateAndRender();
   });
 
@@ -57,11 +64,57 @@ function bindEvents() {
     }
     const text = await file.text();
     loadWorkCsv(text);
+    saveToLocalStorage(STORAGE_KEY_WORK, text);
     calculateAndRender();
   });
 
   elements.exportButton.addEventListener("click", () => {
     exportWorkCsv();
+  });
+
+  elements.clearButton.addEventListener("click", () => {
+    clearWorkData();
+  });
+
+  elements.targetMonth.addEventListener("change", () => {
+    const newMonth = elements.targetMonth.value.trim();
+    if (!newMonth) {
+      // 空の場合はデフォルト値に戻す
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    if (!isValidMonth(newMonth)) {
+      alert("対象月の形式が不正です（YYYY-MM）。");
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    // 稼働日がすべて未入力の場合のみ対象月を変更可能
+    const rows = getRowInputs();
+    const hasAnyInput = rows.some((row) => row.start || row.end || row.break);
+
+    if (hasAnyInput) {
+      alert("稼働日に入力がある場合は対象月を変更できません。入力内容をクリアしてからお試しください。");
+      elements.targetMonth.value = state.targetMonth;
+      return;
+    }
+
+    // 対象月を変更
+    state.targetMonth = newMonth;
+    state.holidays = new Set(Array.from(state.holidays).filter((date) => date.startsWith(state.targetMonth)));
+    renderRows();
+    resetSummary();
+    setErrors([]);
+  });
+}
+
+function bindInputChangeListeners() {
+  const inputs = elements.workTableBody.querySelectorAll('input[type="time"]');
+  inputs.forEach((input) => {
+    input.addEventListener("input", () => {
+      saveCurrentWorkDataToLocalStorage();
+    });
   });
 }
 
@@ -83,6 +136,19 @@ function renderRows(existingRows = new Map()) {
     const row = document.createElement("tr");
     row.dataset.date = date;
 
+    // 土日祝日の判定
+    const dayOfWeek = toDate(date).getDay();
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isHoliday = state.holidays.has(date);
+    
+    if (isSaturday) {
+      row.classList.add("saturday");
+    }
+    if (isSunday || isHoliday) {
+      row.classList.add("sunday-holiday");
+    }
+
     row.innerHTML = `
       <td>${date}</td>
       <td><input data-field="start" type="time" value="${escapeAttr(existing.start || "")}"></td>
@@ -96,6 +162,9 @@ function renderRows(existingRows = new Map()) {
 
     elements.workTableBody.appendChild(row);
   });
+  
+  // 入力フィールドの変更を監視してLocalStorageに自動保存
+  bindInputChangeListeners();
 }
 
 function getDatesOfMonth(month) {
@@ -164,6 +233,12 @@ function calculateAndRender() {
 
     resetRowView(view);
 
+    // 平日のバリデーション
+    const dayOfWeek = toDate(row.date).getDay();
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isNonWorkingDay = isSaturday || isSunday || isHoliday;
+
     const isAllBlank = !row.start && !row.end && !row.break;
     if (isAllBlank) {
       view.cumulative.textContent = cumulativeRoundedDecimal.toFixed(2);
@@ -171,8 +246,11 @@ function calculateAndRender() {
     }
 
     if (!row.start || !row.end || !row.break) {
-      errors.push(`${row.date}: 開始・終了・休憩はすべて入力してください。`);
-      setRowError(view);
+      // 土日祝日は未入力でもエラーにしない
+      if (!isNonWorkingDay) {
+        errors.push(`${row.date}: 開始・終了・休憩はすべて入力してください。`);
+        setRowError(view);
+      }
       view.cumulative.textContent = cumulativeRoundedDecimal.toFixed(2);
       return;
     }
@@ -357,12 +435,16 @@ function exportWorkCsv() {
 
   rows.forEach((row) => {
     const isAllBlank = !row.start && !row.end && !row.break;
+    
+    // 未入力行も出力対象（未入力の場合は空文字列で出力）
     if (isAllBlank) {
+      outputRows.push([row.date, "", "", "", cumulativeRoundedDecimal.toFixed(2)]);
       return;
     }
 
     if (!row.start || !row.end || !row.break) {
-      errors.push(`${row.date}: CSV出力には開始・終了・休憩の入力が必要です。`);
+      // 不完全な入力行も出力対象（累積値の計算は行わない）
+      outputRows.push([row.date, row.start, row.end, row.break, cumulativeRoundedDecimal.toFixed(2)]);
       return;
     }
 
@@ -568,4 +650,120 @@ function splitCsvLine(line) {
 
 function escapeAttr(value) {
   return value.replace(/"/g, "&quot;");
+}
+
+function saveToLocalStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn("LocalStorage への保存に失敗しました:", error.message);
+  }
+}
+
+function restoreFromLocalStorage() {
+  try {
+    // 休日CSVの復元
+    const holidaysData = localStorage.getItem(STORAGE_KEY_HOLIDAYS);
+    if (holidaysData) {
+      loadHolidayCsv(holidaysData);
+    }
+    
+    // 勤務CSVの復元
+    const workData = localStorage.getItem(STORAGE_KEY_WORK);
+    if (workData) {
+      loadWorkCsv(workData);
+      calculateAndRender();
+    }
+  } catch (error) {
+    console.warn("LocalStorage からの復元に失敗しました:", error.message);
+  }
+}
+
+function saveCurrentWorkDataToLocalStorage() {
+  try {
+    const rows = getRowInputs();
+    const csvLines = [REQUIRED_WORK_HEADERS.join(",")];
+    
+    let cumulativeRoundedDecimal = 0;
+    
+    rows.forEach((row) => {
+      // 空白行はスキップ
+      const isAllBlank = !row.start && !row.end && !row.break;
+      if (isAllBlank) {
+        return;
+      }
+      
+      // 不完全な入力もスキップ
+      if (!row.start || !row.end || !row.break) {
+        return;
+      }
+      
+      // 時刻形式チェック
+      const startMinutes = toMinutes(row.start);
+      const endMinutes = toMinutes(row.end);
+      const breakMinutes = toMinutes(row.break);
+      
+      if (startMinutes === null || endMinutes === null || breakMinutes === null) {
+        return;
+      }
+      
+      if (endMinutes <= startMinutes) {
+        return;
+      }
+      
+      const actualMinutes = endMinutes - startMinutes - breakMinutes;
+      if (actualMinutes < 0) {
+        return;
+      }
+      
+      const rounded15Minutes = Math.round(actualMinutes / 15) * 15;
+      cumulativeRoundedDecimal += rounded15Minutes / 60;
+      
+      csvLines.push([
+        row.date,
+        row.start,
+        row.end,
+        row.break,
+        cumulativeRoundedDecimal.toFixed(2),
+      ].join(","));
+    });
+    
+    const csvText = csvLines.join("\n");
+    localStorage.setItem(STORAGE_KEY_WORK, csvText);
+  } catch (error) {
+    console.warn("LocalStorage への保存に失敗しました:", error.message);
+  }
+}
+
+function clearWorkData() {
+  if (!confirm("入力した勤務データをすべて削除します。よろしいですか？")) {
+    return;
+  }
+  
+  // Clear all input fields in the table
+  const rows = elements.workTableBody.querySelectorAll("tr");
+  rows.forEach((row) => {
+    row.querySelector('input[data-field="start"]').value = "";
+    row.querySelector('input[data-field="end"]').value = "";
+    row.querySelector('input[data-field="break"]').value = DEFAULT_BREAK;
+  });
+  
+  // LocalStorageからも削除
+  try {
+    localStorage.removeItem(STORAGE_KEY_WORK);
+  } catch (error) {
+    console.warn("LocalStorage からのデータ削除に失敗しました:", error.message);
+  }
+  
+  // Recalculate to show empty state
+  calculateAndRender();
+}
+
+function isValidMonth(value) {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [yearStr, monthStr] = value.split("-");
+  const month = Number(monthStr);
+  return month >= 1 && month <= 12;
 }

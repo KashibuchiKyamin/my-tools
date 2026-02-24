@@ -190,8 +190,10 @@ classDiagram
 - `implementation/src/index.html`
 - `implementation/src/style.css`
 - `implementation/src/app.js`
+- `implementation/src/logic.js`
 - `implementation/tests/test.html`（簡易テストページ）
 - `implementation/tests/test.js`
+- `implementation/tests/logic.test.js`（Jest単体テスト）
 
 ## 8. テスト観点（設計レベル）
 1. 稼働日数計算

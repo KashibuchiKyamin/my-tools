@@ -1,0 +1,11 @@
+# Node.js
+node_modules/
+
+# Test artifacts
+coverage/
+working-time-calculator/implementation/coverage/
+working-time-calculator/implementation/playwright-report/
+working-time-calculator/implementation/test-results/
+
+# Playwright
+playwright-report/
